@@ -1,0 +1,13 @@
+{
+  "url": "",
+  "credit_code": "",
+  "username": "",
+  "password": "",
+  "login": {
+    "credit_code_selector": "input[placeholder='请输入社会信用代码']",
+    "username_selector": "input[placeholder='请选择用户名']",
+    "password_selector": "input[placeholder='请输入密码'], input[type='password']",
+    "submit_selector": "button.login-btn, button.el-button--primary",
+    "success_indicator": ".el-menu, .avue-layout, .main-content"
+  }
+}

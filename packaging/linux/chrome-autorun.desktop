@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=ChromeAutoRun
+Comment=Chrome report automation tool
+Exec=chrome-autorun
+Terminal=true
+Categories=Network;Utility;

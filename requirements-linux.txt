@@ -1,0 +1,5 @@
+# These are installed into the DEB's private vendor directory using its bundled
+# CPython runtime. Pin direct dependencies to keep the browser-control behavior
+# stable across package rebuilds.
+selenium==4.49.0
+openpyxl==3.1.5

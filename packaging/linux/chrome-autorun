@@ -1,0 +1,28 @@
+#!/bin/sh
+set -eu
+
+APP_ROOT=/opt/chrome-autorun
+
+if [ -n "${CHROMEAUTORUN_HOME:-}" ]; then
+    DATA_DIR=$CHROMEAUTORUN_HOME
+elif [ -n "${XDG_DATA_HOME:-}" ]; then
+    DATA_DIR=$XDG_DATA_HOME/chrome-autorun
+else
+    DATA_DIR=${HOME:?HOME is not set}/.local/share/chrome-autorun
+fi
+
+mkdir -p "$DATA_DIR"
+for name in config.json config.xlsx; do
+    if [ ! -e "$DATA_DIR/$name" ]; then
+        cp "$APP_ROOT/defaults/$name" "$DATA_DIR/$name"
+    fi
+done
+
+export CHROMEAUTORUN_HOME=$DATA_DIR
+if [ -n "${PYTHONPATH:-}" ]; then
+    export PYTHONPATH="$APP_ROOT/vendor:$PYTHONPATH"
+else
+    export PYTHONPATH=$APP_ROOT/vendor
+fi
+
+exec "$APP_ROOT/runtime/python/bin/python3" "$APP_ROOT/main.py" "$@"

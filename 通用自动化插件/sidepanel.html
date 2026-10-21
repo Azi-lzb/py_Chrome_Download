@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>网页自动化</title>
+  <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+
+<!-- 顶部工具栏 -->
+<div class="topbar">
+  <div class="app-title">🤖 网页自动化录制工具</div>
+  <div class="flow-bar">
+    <select id="flowSelect" title="选择已保存流程"></select>
+    <input id="flowName" type="text" placeholder="流程名称" maxlength="40">
+    <button id="btnSave" title="保存当前流程">保存</button>
+    <button id="btnDelete" class="btn-danger" title="删除所选流程">删除</button>
+  </div>
+</div>
+
+<!-- 控制按钮行 -->
+<div class="ctrl-bar">
+  <button id="btnRecord" class="btn-rec">● 录制</button>
+  <button id="btnRun"    class="btn-run" disabled>▶ 运行</button>
+  <button id="btnStop"   class="btn-stop" disabled>■ 停止</button>
+  <button id="btnClear"  class="btn-ghost">清空</button>
+</div>
+
+<!-- 预置流程快捷栏 -->
+<div class="preset-bar">
+  <button id="btnLaunch"  class="btn-launch">🚀 启动系统</button>
+  <button id="btnPreset1" class="btn-preset">📊 FR筛选</button>
+  <button id="btnPreset2" class="btn-preset">📋 任务导出</button>
+</div>
+
+<!-- 进度条 -->
+<div id="progressArea" class="progress-area hidden">
+  <div class="prog-bar-wrap"><div id="progBar" class="prog-bar"></div></div>
+  <div id="progText" class="prog-text">-</div>
+</div>
+
+<!-- 步骤列表 -->
+<div class="steps-header">
+  <span id="stepCount" class="step-count">0 步</span>
+  <div class="steps-actions">
+    <button id="btnAddWait"    class="btn-xs">+ 等待</button>
+    <button id="btnAddBack"    class="btn-xs">+ 返回</button>
+    <button id="btnMakeLoop"   class="btn-xs btn-loop">⟳ 创建循环</button>
+    <button id="btnExportJson" class="btn-xs">↓ JSON</button>
+    <button id="btnExportPy"   class="btn-xs">↓ Python</button>
+    <button id="btnImportCr"   class="btn-xs btn-import">↑ 导入</button>
+    <input  id="crFileInput"   type="file" accept=".json" style="display:none">
+  </div>
+</div>
+
+<div id="stepList" class="step-list">
+  <div class="empty-hint">录制或手动添加步骤后显示在此处</div>
+</div>
+
+<!-- 循环创建对话框 -->
+<div id="loopDialog" class="dialog hidden">
+  <div class="dialog-inner">
+    <div class="dialog-title">创建循环步骤</div>
+
+    <label>循环来源</label>
+    <select id="loopSource">
+      <option value="elements">表格行 / 列表项（CSS 选择器匹配）</option>
+      <option value="dropdown">下拉框选项（自动枚举所有选项）</option>
+    </select>
+
+    <label>目标选择器 <button id="btnPickLoop" class="btn-pick">从页面选取</button></label>
+    <input id="loopSelector" type="text" placeholder="例: table tbody tr  或  [widgetname='JGMC']">
+
+    <div id="loopClickTargetRow">
+      <label>点击目标（可选，循环项内需要点击的子元素）</label>
+      <input id="loopClickTarget" type="text" placeholder="例: td:first-child a  （留空则点击整行）">
+    </div>
+
+    <label>过滤条件（只处理匹配的项）</label>
+    <div class="cond-row">
+      <select id="filterType">
+        <option value="">不过滤（全部处理）</option>
+        <option value="text_contains">文字包含</option>
+        <option value="text_not_contains">文字不包含</option>
+        <option value="date_contains">日期包含</option>
+      </select>
+      <input id="filterValue" type="text" placeholder="关键字 / 日期如 2026-03">
+    </div>
+
+    <label>终止条件</label>
+    <div class="cond-row">
+      <select id="stopType">
+        <option value="">处理全部（无条件停止）</option>
+        <option value="text_contains">遇到文字包含时停止</option>
+        <option value="text_not_contains">遇到文字不包含时停止</option>
+      </select>
+      <input id="stopValue" type="text" placeholder="停止关键字">
+    </div>
+
+    <div class="dialog-hint">
+      ⚑ 将在选中步骤（<span id="selectedCount">0</span>步）外包裹循环。<br>
+      循环内 "点击循环项" 步骤 会自动点击当前迭代元素。
+    </div>
+
+    <div class="dialog-btns">
+      <button id="btnLoopConfirm" class="btn-run">确定</button>
+      <button id="btnLoopCancel" class="btn-ghost">取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- 步骤编辑对话框 -->
+<div id="editDialog" class="dialog hidden">
+  <div class="dialog-inner">
+    <div class="dialog-title">编辑步骤</div>
+    <div id="editFields"></div>
+    <div class="dialog-btns">
+      <button id="btnEditConfirm" class="btn-run">确定</button>
+      <button id="btnEditCancel" class="btn-ghost">取消</button>
+    </div>
+  </div>
+</div>
+
+<script src="presets.js"></script>
+<script src="sidepanel.js"></script>
+</body>
+</html>

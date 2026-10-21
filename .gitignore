@@ -1,0 +1,11 @@
+__pycache__/
+build/
+dist/
+.build/
+chrome_profile/
+output/
+*.pyc
+*.pyo
+*.spec
+drivers/*_tmp/
+drivers/*.zip

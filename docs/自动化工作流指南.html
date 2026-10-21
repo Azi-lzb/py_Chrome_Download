@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>网页自动化工作流指南</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: "Microsoft YaHei", sans-serif;
+  background: #f5f6fa;
+  color: #1a1a2e;
+  padding: 32px 24px;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+h1 { font-size: 22px; color: #1a1a2e; margin-bottom: 6px; }
+.subtitle { font-size: 13px; color: #888; margin-bottom: 32px; }
+
+/* ── 主流程 ── */
+.pipeline {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  margin-bottom: 40px;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 2px 12px rgba(0,0,0,.07);
+  overflow: hidden;
+}
+.pipe-step {
+  flex: 1;
+  padding: 24px 18px;
+  text-align: center;
+  border-right: 1px solid #f0f0f0;
+  position: relative;
+}
+.pipe-step:last-child { border-right: none; }
+.pipe-step .num {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700;
+  margin: 0 auto 10px;
+}
+.pipe-step h3 { font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+.pipe-step p  { font-size: 12px; color: #888; line-height: 1.6; }
+.pipe-step .tool-tag {
+  display: inline-block;
+  font-size: 10px; padding: 2px 8px;
+  border-radius: 10px; margin-top: 8px; font-weight: 600;
+}
+.s1 .num { background: #dbeafe; color: #1e40af; }
+.s1 .tool-tag { background: #dbeafe; color: #1e40af; }
+.s2 .num { background: #dcfce7; color: #166534; }
+.s2 .tool-tag { background: #dcfce7; color: #166534; }
+.s3 .num { background: #fef9c3; color: #854d0e; }
+.s3 .tool-tag { background: #fef9c3; color: #854d0e; }
+.s4 .num { background: #fce7f3; color: #9d174d; }
+.s4 .tool-tag { background: #fce7f3; color: #9d174d; }
+
+.arrow-between {
+  display: flex; align-items: center;
+  font-size: 20px; color: #d1d5db;
+  padding: 0 2px;
+  flex-shrink: 0;
+}
+
+/* ── 区块卡片 ── */
+.section { margin-bottom: 28px; }
+.section-title {
+  font-size: 15px; font-weight: 700;
+  margin-bottom: 14px;
+  display: flex; align-items: center; gap: 8px;
+}
+.section-title .badge {
+  font-size: 11px; padding: 2px 10px;
+  border-radius: 20px; font-weight: 600;
+}
+
+.cards { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.cards.three { grid-template-columns: 1fr 1fr 1fr; }
+.card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 18px;
+  box-shadow: 0 1px 6px rgba(0,0,0,.06);
+}
+.card h4 { font-size: 13px; margin-bottom: 8px; color: #1a1a2e; }
+.card p, .card li { font-size: 12px; color: #666; line-height: 1.8; }
+.card ul { padding-left: 16px; }
+.card .key {
+  display: inline-block;
+  background: #f3f4f6; border: 1px solid #d1d5db;
+  border-radius: 4px; padding: 1px 6px;
+  font-family: monospace; font-size: 11px; color: #374151;
+}
+
+/* ── 步骤列表 ── */
+.steps-list { counter-reset: step-counter; }
+.step-item {
+  display: flex; gap: 14px;
+  background: #fff;
+  border-radius: 10px;
+  padding: 16px 18px;
+  margin-bottom: 10px;
+  box-shadow: 0 1px 6px rgba(0,0,0,.05);
+  align-items: flex-start;
+}
+.step-item::before {
+  counter-increment: step-counter;
+  content: counter(step-counter);
+  min-width: 26px; height: 26px;
+  border-radius: 50%;
+  background: #1a1a2e; color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700;
+  flex-shrink: 0;
+}
+.step-item .content h4 { font-size: 13px; margin-bottom: 4px; }
+.step-item .content p  { font-size: 12px; color: #666; line-height: 1.6; }
+
+/* ── 代码块 ── */
+pre {
+  background: #1e1e2e; color: #cdd6f4;
+  border-radius: 8px; padding: 16px;
+  font-size: 12px; line-height: 1.7;
+  overflow-x: auto; font-family: Consolas, monospace;
+  margin-top: 10px;
+}
+.cm  { color: #6c7086; }
+.kw  { color: #cba6f7; }
+.st  { color: #a6e3a1; }
+.fn  { color: #89b4fa; }
+.op  { color: #89dceb; }
+
+/* ── 对比表 ── */
+table {
+  width: 100%; border-collapse: collapse;
+  background: #fff; border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 1px 6px rgba(0,0,0,.06);
+  font-size: 12px;
+}
+th {
+  background: #1a1a2e; color: #fff;
+  padding: 10px 14px; text-align: left;
+}
+td { padding: 10px 14px; border-bottom: 1px solid #f3f4f6; }
+tr:last-child td { border-bottom: none; }
+tr:nth-child(even) td { background: #f9fafb; }
+.yes { color: #16a34a; font-weight: 700; }
+.no  { color: #dc2626; }
+.part { color: #d97706; }
+
+/* ── tip ── */
+.tip {
+  background: #fffbeb;
+  border-left: 4px solid #f59e0b;
+  border-radius: 0 8px 8px 0;
+  padding: 12px 16px;
+  font-size: 12px; color: #6b4c00;
+  line-height: 1.7; margin-top: 14px;
+}
+.tip strong { color: #92400e; }
+
+/* ── 文件目录 ── */
+.filetree {
+  background: #fff;
+  border-radius: 10px;
+  padding: 18px 20px;
+  box-shadow: 0 1px 6px rgba(0,0,0,.06);
+  font-family: Consolas, monospace;
+  font-size: 12px; line-height: 2;
+  color: #374151;
+}
+.filetree .dir  { color: #1e40af; font-weight: 700; }
+.filetree .file { color: #374151; }
+.filetree .desc { color: #9ca3af; font-size: 11px; margin-left: 8px; }
+</style>
+</head>
+<body>
+
+<h1>网页自动化工作流指南</h1>
+<p class="subtitle">Chrome Recorder 录制 → JSON 导出 → Python Selenium 执行 / 插件辅助局部操作</p>
+
+<!-- ── 主流程 ── -->
+<div class="pipeline">
+  <div class="pipe-step s1">
+    <div class="num">1</div>
+    <h3>录制操作</h3>
+    <p>在目标页面录制点击、填写、导航等操作</p>
+    <span class="tool-tag">Chrome Recorder</span>
+  </div>
+  <div class="arrow-between">›</div>
+  <div class="pipe-step s2">
+    <div class="num">2</div>
+    <h3>导出 JSON</h3>
+    <p>下载包含多备用选择器的录制文件</p>
+    <span class="tool-tag">↓ JSON</span>
+  </div>
+  <div class="arrow-between">›</div>
+  <div class="pipe-step s3">
+    <div class="num">3</div>
+    <h3>转换脚本</h3>
+    <p>一条命令生成可运行的 Python 文件</p>
+    <span class="tool-tag">chrome_recorder_to_selenium.py</span>
+  </div>
+  <div class="arrow-between">›</div>
+  <div class="pipe-step s4">
+    <div class="num">4</div>
+    <h3>执行 / 调整</h3>
+    <p>运行 Python，按需加循环、异常处理</p>
+    <span class="tool-tag">Python + Selenium</span>
+  </div>
+</div>
+
+<!-- ── Chrome Recorder 操作步骤 ── -->
+<div class="section">
+  <div class="section-title">
+    Chrome Recorder 使用步骤
+    <span class="badge" style="background:#dbeafe;color:#1e40af;">内置工具 无需安装</span>
+  </div>
+  <div class="steps-list">
+    <div class="step-item">
+      <div class="content">
+        <h4>打开 DevTools Recorder 面板</h4>
+        <p>按 <span class="key">F12</span> 打开开发者工具 → 顶部点 <span class="key">&gt;&gt;</span> 展开更多面板 → 点击 <strong>Recorder</strong></p>
+      </div>
+    </div>
+    <div class="step-item">
+      <div class="content">
+        <h4>新建录制并开始</h4>
+        <p>点击 <strong>Create a new recording</strong> → 填写名称 → 点 <strong>Start recording</strong>（红点亮起）</p>
+      </div>
+    </div>
+    <div class="step-item">
+      <div class="content">
+        <h4>正常操作页面</h4>
+        <p>像平时一样点击、填写、跳转页面。跨页导航会自动被记录，不会中断录制。</p>
+      </div>
+    </div>
+    <div class="step-item">
+      <div class="content">
+        <h4>停止并导出 JSON</h4>
+        <p>操作完成后点 <strong>End recording</strong> → 点右上角 <strong>⋮</strong> 菜单 → 选 <strong>Export as JSON</strong> → 保存到 <code>网页自动化/</code> 目录</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── 转换命令 ── -->
+<div class="section">
+  <div class="section-title">
+    转换命令
+    <span class="badge" style="background:#dcfce7;color:#166534;">一行命令</span>
+  </div>
+  <div class="card">
+    <h4>基础用法</h4>
+<pre><span class="cm"># 在 网页自动化/ 目录下运行</span>
+python chrome_recorder_to_selenium.py 录制文件.json
+
+<span class="cm"># 指定输出文件名</span>
+python chrome_recorder_to_selenium.py 录制文件.json -o 查询导出流程.py</pre>
+  </div>
+  <div class="tip">
+    <strong>生成的 Python 文件</strong>包含：自动等待加载、多选择器依次尝试、异常报告具体是哪个选择器失败、最后按 Enter 才关闭浏览器（方便观察结果）。
+  </div>
+</div>
+
+<!-- ── 生成的 Python 示例 ── -->
+<div class="section">
+  <div class="section-title">生成的 Python 脚本示例</div>
+  <div class="card">
+<pre><span class="cm"># 步骤 1: navigate → https://example.com/report</span>
+driver.<span class="fn">get</span>(<span class="st">"https://example.com/report"</span>)
+<span class="fn">wait_load</span>(driver)
+
+<span class="cm"># 步骤 2: change  [select#report-type]</span>
+el = <span class="fn">find_el</span>(driver, [(<span class="st">'CSS_SELECTOR'</span>, <span class="st">'select#report-type'</span>),
+                       (<span class="st">'XPATH'</span>, <span class="st">'//select[@id="report-type"]'</span>)])
+<span class="kw">if</span> el.tag_name.lower() == <span class="st">'select'</span>:
+    <span class="fn">Select</span>(el).<span class="fn">select_by_visible_text</span>(<span class="st">"月报"</span>)
+time.<span class="fn">sleep</span>(<span class="op">0.3</span>)
+
+<span class="cm"># 步骤 3: click  [#query-btn]</span>
+<span class="fn">find_el</span>(driver, [(<span class="st">'CSS_SELECTOR'</span>, <span class="st">'#query-btn'</span>),
+                 (<span class="st">'XPATH'</span>, <span class="st">'//button[@id="query-btn"]'</span>),
+                 (<span class="st">'XPATH'</span>, <span class="st">'//*/[normalize-space(.)="查询"]'</span>)]).<span class="fn">click</span>()
+time.<span class="fn">sleep</span>(<span class="op">0.5</span>)</pre>
+  </div>
+</div>
+
+<!-- ── 插件用途 ── -->
+<div class="section">
+  <div class="section-title">
+    自动化插件的辅助用途
+    <span class="badge" style="background:#fce7f3;color:#9d174d;">局部补充</span>
+  </div>
+  <div class="cards">
+    <div class="card">
+      <h4>循环遍历下拉列表</h4>
+      <p>Chrome Recorder 不支持循环，用插件录制"选下拉 → 查询 → 导出"一个循环体，导出 JSON 后让 Claude 补全 Python 循环逻辑。</p>
+    </div>
+    <div class="card">
+      <h4>获取精确选择器</h4>
+      <p>用插件的元素拾取器（橙色边框）选中目标元素，可以看到 ID、widgetname、CSS 路径等多个选择器，复制给 Python 脚本用。</p>
+    </div>
+    <div class="card">
+      <h4>FineReport 专项操作</h4>
+      <p>内网 FineReport 系统有专属 API（<code>_g().exportReportToExcel</code>），插件内置了这个步骤类型，比 Selenium 点击导出按钮更可靠。</p>
+    </div>
+  </div>
+</div>
+
+<!-- ── 工具对比 ── -->
+<div class="section">
+  <div class="section-title">工具对比</div>
+  <table>
+    <tr>
+      <th>能力</th>
+      <th>Chrome Recorder</th>
+      <th>自动化插件</th>
+      <th>Python Selenium</th>
+    </tr>
+    <tr>
+      <td>跨页面导航录制</td>
+      <td class="yes">✓</td>
+      <td class="no">不稳定</td>
+      <td class="yes">✓</td>
+    </tr>
+    <tr>
+      <td>多备用选择器</td>
+      <td class="yes">✓ 自动生成</td>
+      <td class="yes">✓ 已支持</td>
+      <td class="yes">✓ 手写</td>
+    </tr>
+    <tr>
+      <td>循环遍历</td>
+      <td class="no">✗</td>
+      <td class="yes">✓ 核心功能</td>
+      <td class="yes">✓ for 循环</td>
+    </tr>
+    <tr>
+      <td>iframe 内操作</td>
+      <td class="yes">✓</td>
+      <td class="part">已修复（待测试）</td>
+      <td class="yes">✓ switch_to.frame</td>
+    </tr>
+    <tr>
+      <td>需要安装</td>
+      <td class="yes">无需</td>
+      <td class="part">需装扩展</td>
+      <td class="part">需装 Python</td>
+    </tr>
+    <tr>
+      <td>出错可调试</td>
+      <td class="no">有限</td>
+      <td class="no">难</td>
+      <td class="yes">✓ 逐行调试</td>
+    </tr>
+  </table>
+</div>
+
+<!-- ── 目录结构 ── -->
+<div class="section">
+  <div class="section-title">目录结构</div>
+  <div class="filetree">
+    <span class="dir">网页自动化/</span><br>
+    &nbsp;&nbsp;├── <span class="dir">通用自动化插件/</span><span class="desc">← Chrome 扩展源码</span><br>
+    &nbsp;&nbsp;├── <span class="file">chrome_recorder_to_selenium.py</span><span class="desc">← JSON 转 Python 工具</span><br>
+    &nbsp;&nbsp;├── <span class="file">自动化工作流指南.html</span><span class="desc">← 本文档</span><br>
+    &nbsp;&nbsp;├── <span class="file">内网自动化测试指南.html</span><br>
+    &nbsp;&nbsp;├── <span class="dir">recordings/</span><span class="desc">← 建议：存放录制的 JSON 文件</span><br>
+    &nbsp;&nbsp;└── <span class="dir">scripts/</span><span class="desc">← 建议：存放生成的 Python 脚本</span><br>
+  </div>
+</div>
+
+</body>
+</html>

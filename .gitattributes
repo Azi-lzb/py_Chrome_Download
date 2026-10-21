@@ -1,0 +1,4 @@
+packaging/linux/*.sh text eol=lf
+packaging/linux/chrome-autorun text eol=lf
+packaging/linux/*.desktop text eol=lf
+*.bat text eol=crlf

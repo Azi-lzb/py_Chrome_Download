@@ -1,0 +1,331 @@
+{
+    "title": "Recording 2026/5/13 at 08:39:50",
+    "steps": [
+        {
+            "type": "setViewport",
+            "width": 1854,
+            "height": 1021,
+            "deviceScaleFactor": 1,
+            "isMobile": false,
+            "hasTouch": false,
+            "isLandscape": false
+        },
+        {
+            "type": "navigate",
+            "url": "http://11.210.4.110/fsdc2020/new/main/#/dataSharing/sharing005/appMaintain",
+            "assertedEvents": [
+                {
+                    "type": "navigation",
+                    "url": "http://11.210.4.110/fsdc2020/new/main/#/dataSharing/sharing005/appMaintain",
+                    "title": "国家金融基础数据库大数据平台"
+                }
+            ]
+        },
+        {
+            "type": "click",
+            "target": "main",
+            "selectors": [
+                [
+                    "div.fr-trigger-btn-over > div"
+                ],
+                [
+                    "xpath//html/body/div[1]/div[1]/div[2]/div/div[15]/div[2]/div"
+                ],
+                [
+                    "pierce/div.fr-trigger-btn-over > div"
+                ]
+            ],
+            "offsetY": 6.031246185302734,
+            "offsetX": 14.0242919921875,
+            "frame": [
+                1
+            ]
+        },
+        {
+            "type": "click",
+            "target": "main",
+            "selectors": [
+                [
+                    "body"
+                ],
+                [
+                    "xpath//html/body"
+                ],
+                [
+                    "pierce/body"
+                ]
+            ],
+            "offsetY": 241,
+            "offsetX": 255,
+            "frame": [
+                1
+            ]
+        },
+        {
+            "type": "doubleClick",
+            "target": "main",
+            "selectors": [
+                [
+                    "#content-container"
+                ],
+                [
+                    "xpath///*[@id=\"content-container\"]"
+                ],
+                [
+                    "pierce/#content-container"
+                ]
+            ],
+            "offsetY": 135.02777099609375,
+            "offsetX": 255,
+            "frame": [
+                1
+            ]
+        },
+        {
+            "type": "click",
+            "target": "main",
+            "selectors": [
+                [
+                    "div.fr-trigger-btn-over"
+                ],
+                [
+                    "xpath//html/body/div[1]/div[1]/div[2]/div/div[10]/div[2]"
+                ],
+                [
+                    "pierce/div.fr-trigger-btn-over"
+                ]
+            ],
+            "offsetY": 3.0173568725585938,
+            "offsetX": 0.020751953125,
+            "frame": [
+                1
+            ]
+        },
+        {
+            "type": "click",
+            "target": "main",
+            "selectors": [
+                [
+                    "div.fr-trigger-btn-over"
+                ],
+                [
+                    "xpath//html/body/div[1]/div[1]/div[2]/div/div[12]/div[2]"
+                ],
+                [
+                    "pierce/div.fr-trigger-btn-over"
+                ]
+            ],
+            "offsetY": 11.017356872558594,
+            "offsetX": 18.0242919921875,
+            "frame": [
+                1
+            ]
+        },
+        {
+            "type": "click",
+            "target": "main",
+            "selectors": [
+                [
+                    "div.fr-combo-list-item > div"
+                ],
+                [
+                    "xpath//html/body/div[3]/div[4]/div[2]/div"
+                ],
+                [
+                    "pierce/div.fr-combo-list-item > div"
+                ]
+            ],
+            "offsetY": 6.565971374511719,
+            "offsetX": 58.78125,
+            "frame": [
+                1
+            ]
+        },
+        {
+            "type": "click",
+            "target": "main",
+            "selectors": [
+                [
+                    "div.fr-combo-list-item span"
+                ],
+                [
+                    "xpath//html/body/div[3]/div[4]/div[2]/div/span"
+                ],
+                [
+                    "pierce/div.fr-combo-list-item span"
+                ],
+                [
+                    "text/广东省"
+                ]
+            ],
+            "offsetY": 9.444442749023438,
+            "offsetX": 50.78125,
+            "frame": [
+                1
+            ]
+        },
+        {
+            "type": "click",
+            "target": "main",
+            "selectors": [
+                [
+                    "div.parameter-container > div:nth-of-type(1)"
+                ],
+                [
+                    "xpath//html/body/div[1]/div[1]/div[1]"
+                ],
+                [
+                    "pierce/div.parameter-container > div:nth-of-type(1)"
+                ]
+            ],
+            "offsetY": 2.013885498046875,
+            "offsetX": 913,
+            "frame": [
+                1
+            ]
+        },
+        {
+            "type": "click",
+            "target": "main",
+            "selectors": [
+                [
+                    "div.fr-trigger-btn-over > div"
+                ],
+                [
+                    "xpath//html/body/div[1]/div[1]/div[2]/div/div[13]/div[2]/div"
+                ],
+                [
+                    "pierce/div.fr-trigger-btn-over > div"
+                ]
+            ],
+            "offsetY": 0.031246185302734375,
+            "offsetX": 8.0103759765625,
+            "frame": [
+                1
+            ]
+        },
+        {
+            "type": "click",
+            "target": "main",
+            "selectors": [
+                [
+                    "div:nth-of-type(5) > div.fr-combo-list-item span"
+                ],
+                [
+                    "xpath//html/body/div[3]/div[5]/div[2]/div/span"
+                ],
+                [
+                    "pierce/div:nth-of-type(5) > div.fr-combo-list-item span"
+                ],
+                [
+                    "text/惠州市"
+                ]
+            ],
+            "offsetY": 12.444442749023438,
+            "offsetX": 38.7777099609375,
+            "frame": [
+                1
+            ]
+        },
+        {
+            "type": "click",
+            "target": "main",
+            "selectors": [
+                [
+                    "div.fr-trigger-btn-over > div"
+                ],
+                [
+                    "xpath//html/body/div[1]/div[1]/div[2]/div/div[14]/div[2]/div"
+                ],
+                [
+                    "pierce/div.fr-trigger-btn-over > div"
+                ]
+            ],
+            "offsetY": 2.0312461853027344,
+            "offsetX": 10.017333984375,
+            "frame": [
+                1
+            ]
+        },
+        {
+            "type": "click",
+            "target": "main",
+            "selectors": [
+                [
+                    "div:nth-of-type(6) > div.fr-checkbox-control span"
+                ],
+                [
+                    "xpath//html/body/div[3]/div[6]/div[1]/div/span"
+                ],
+                [
+                    "pierce/div:nth-of-type(6) > div.fr-checkbox-control span"
+                ]
+            ],
+            "offsetY": 9.767356872558594,
+            "offsetX": 40.7916259765625,
+            "frame": [
+                1
+            ]
+        },
+        {
+            "type": "click",
+            "target": "main",
+            "selectors": [
+                [
+                    "div.fr-trigger-btn-over"
+                ],
+                [
+                    "xpath//html/body/div[1]/div[1]/div[2]/div/div[2]/div[2]"
+                ],
+                [
+                    "pierce/div.fr-trigger-btn-over"
+                ]
+            ],
+            "offsetY": 4.017356872558594,
+            "offsetX": 3.0242919921875,
+            "frame": [
+                1
+            ]
+        },
+        {
+            "type": "click",
+            "target": "main",
+            "selectors": [
+                [
+                    "div.fr-trigger-btn-over"
+                ],
+                [
+                    "xpath//html/body/div[1]/div[1]/div[2]/div/div[2]/div[2]"
+                ],
+                [
+                    "pierce/div.fr-trigger-btn-over"
+                ]
+            ],
+            "offsetY": 4.017356872558594,
+            "offsetX": 3.0242919921875,
+            "frame": [
+                1
+            ]
+        },
+        {
+            "type": "click",
+            "target": "main",
+            "selectors": [
+                [
+                    "#content-container"
+                ],
+                [
+                    "xpath///*[@id=\"content-container\"]"
+                ],
+                [
+                    "pierce/#content-container"
+                ]
+            ],
+            "offsetY": 170.02777099609375,
+            "offsetX": 264,
+            "frame": [
+                1
+            ]
+        }
+    ]
+}
