@@ -51,19 +51,15 @@ python main.py
 - `2` logs in.
 - `2.5` performs one-click launch + login + report-page navigation.
 - `3`, `4`, and `5` run the three formal matrix export scenes with strong recovery fallback: `county`, `org`, and `county2`.
-- Hidden aliases `3p`, `4p`, and `5p` run the old plain/no-recovery versions for `county`, `org`, and `county2`; do not show them in the menu.
+- The old plain/no-recovery menu aliases have been removed. Use the formal `3/4/5` entries.
 - The old `t31`, `t41`, and `t51` enhanced recovery aliases are intentionally removed.
 - The old low-level `t`, `t2`, and `t3` test menu entries are intentionally hidden for now; their helper functions may remain in code.
 
 ## Recovery Logic
 
-The 3/4/5 export flow uses `_recover_report(scene, plan)` as the fallback chain:
+The 3/4/5 export flow uses `_recover_report(scene, plan)` to restart the browser, log in, navigate the portal and tree, switch iframe, and validate the report. Periodic recovery is disabled by default (`task.refresh_interval=0`).
 
-1. soft refresh: tree navigation + iframe switch,
-2. hard refresh: F5/reload + reestablish,
-3. full recovery: login check/relogin + portal navigation + tree navigation + iframe switch.
-
-Formal menu entries `3/4/5` use the recovery path. Hidden plain aliases `3p/4p/5p` bypass recovery and are kept only as a fallback for manual testing. When changing export behavior, keep `tests/test_matrix_recovery.py` passing.
+Formal menu entries `3/4/5` use this recovery path. Query/export retries after recovery must refill the current coordinate and query again before exporting. When changing export behavior, keep `tests/test_matrix_recovery.py` passing.
 
 ## Editing Rules
 

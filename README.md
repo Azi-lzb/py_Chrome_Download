@@ -73,6 +73,10 @@ python main.py
 
 菜单 12 的网页检查只负责打开网址并读取标题、加载状态和控件数量，不会点击网站控件或提交表单。默认地址为 `https://www.baidu.com`，也可以输入内网的只读页面地址；本地按钮模式不访问网络。
 
+旧的无恢复导出别名已移除，批量导出统一使用菜单 3/4/5。
+
+查询等待会在一次浏览器通信中读取加载状态、查询按钮和文档状态。观察到加载或按钮忙碌后，连续稳定 0.8 秒即继续；始终没有观察到忙碌信号时，会等待完整的 `task.query_wait_seconds` 再按兼容模式继续，这种情况无法仅凭页面状态证明结果已经刷新。配置上限内的慢查询不会仅因耗时长而提前恢复。达到上限但仍忙碌或尚未稳定时，停止当前轮导出并走恢复流程。恢复重试会重新填写条件、查询后导出，每条最多重试 3 次。
+
 ## 配置说明
 
 所有配置集中在 `config.xlsx`，主要 sheet：
@@ -97,6 +101,8 @@ python main.py
 页面 HTML 保存在 `output/` 下。菜单 7/8 会显示每个 HTML 文件的绝对路径和保存目录。DEB 安装版默认把 `output/` 放在 `~/.local/share/chrome-autorun/output/`（或 `$XDG_DATA_HOME/chrome-autorun/output/`）；源码和 Windows 版放在程序目录下的 `output/`。
 
 Chrome 下载默认保存在用户目录下的 `Downloads/`。也可以在 `config.json` 中配置 `download_dir`。启动浏览器时会显示下载目录，程序导出文件后会逐个显示文件的绝对路径。
+
+`run_log.jsonl` 的每条执行记录及 `run_summary.json` 汇总含 `stage_seconds`，分别累计 `fields`（填条件）、`query`（查询）、`download`（导出下载）、`recovery`（恢复）和 `prepare`（其他准备）的秒数。恢复时间从原阶段扣除，避免重复统计。`processed` 是已成功或失败的条目数，`attempt_count` 包括重试及中断轮次；平均每条耗时按已处理条目计算，成功轮次平均只计算最终成功轮次本身的耗时。
 
 每次执行后在 `output/` 下生成：
 

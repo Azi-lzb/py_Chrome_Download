@@ -21,6 +21,7 @@ import shutil
 import subprocess
 
 import uuid
+from contextlib import contextmanager
 
 from pathlib import Path
 
@@ -1797,6 +1798,29 @@ return inp ? (inp.value || '') : null;
     print(f'\U0001f4dd \u65e5\u5fd7: {run_dir}')
 
 
+class _StageTimer:
+    """使用单调时钟累计互不重叠的阶段耗时；恢复结束后继续原阶段。"""
+    def __init__(self):
+        self.seconds = {name: 0.0 for name in ('prepare', 'fields', 'query', 'download', 'recovery')}
+        self.stage = None
+        self.started = time.monotonic()
+
+    def switch(self, stage=None):
+        now = time.monotonic()
+        if self.stage is not None:
+            self.seconds[self.stage] += max(0.0, now - self.started)
+        self.stage, self.started = stage, now
+
+    @contextmanager
+    def measure(self, stage):
+        previous = self.stage
+        self.switch(stage)
+        try:
+            yield
+        finally:
+            self.switch(previous)
+
+
 def _append_jsonl(path, data):
     """追加一行 JSON 到日志文件。"""
     try:
@@ -1837,7 +1861,8 @@ def _inspect_download_file(path):
         "valid_excel": None,
     }
     try:
-        head = p.read_bytes()[:512]
+        with p.open('rb') as stream:
+            head = stream.read(512)
     except Exception as e:
         info["error"] = str(e)
         return info
@@ -4205,74 +4230,93 @@ return false;
         return False
 
 
-def _fr_is_search_button_ready():
-    """检测参数区 SEARCH 查询按钮是否恢复可用。"""
-    js = r"""
-const root = document.querySelector('[widgetname="SEARCH"]');
-if (!root) return null;
-const cls = root.className || '';
-if (cls.includes('ui-state-disabled')) return false;
-if (cls.includes('ui-state-enabled')) return true;
-const btn = root.querySelector('button');
-if (!btn) return true;
-return !btn.disabled;
-"""
+def _fr_read_query_state():
+    """一次 WebDriver 往返读取查询状态，失败时不能当作查询完成。"""
     try:
-        return _driver.execute_script(js)
+        state = _driver.execute_script(r"""
+const selectors = '.loading-whole-indicator,.load-indicator,.el-loading-mask,' +
+    '.el-loading-spinner,.el-icon-loading,.is-loading,[aria-busy="true"]';
+const loading = Array.from(document.querySelectorAll(selectors)).some(el => {
+    const style = window.getComputedStyle(el);
+    if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity || '1') === 0) return false;
+    const rect = el.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+});
+const root = document.querySelector('[widgetname="SEARCH"]');
+let searchReady = null;
+if (root) {
+    const button = root.querySelector('button');
+    searchReady = !root.classList.contains('ui-state-disabled') && !(button && button.disabled);
+}
+return {loading: loading, search_ready: searchReady, ready_state: document.readyState};
+""")
+        if (not isinstance(state, dict) or 'search_ready' not in state or not isinstance(state.get('loading'), bool)
+                or (state.get('search_ready') is not None and not isinstance(state['search_ready'], bool))
+                or state.get('ready_state') not in ('loading', 'interactive', 'complete')):
+            raise ValueError('invalid state')
+        return state
     except Exception:
-        return None
+        # WebDriver 异常可能带完整 URL，仅向外提供固定错误文本。
+        raise RuntimeError('无法读取查询状态，停止本条操作以避免导出旧结果') from None
 
 
-def _fr_wait_query_done(max_wait_seconds, settle_seconds=0.8):
-    """等待查询结束（尽量基于加载状态动态判断，而不是固定长等待）。"""
+def _fr_wait_query_done(max_wait_seconds, settle_seconds=0.8, observed_loading=False):
+    """观察忙碌->稳定完成；未观察到忙碌时等待完整配置时长再兼容处理。"""
     timeout = max(2.0, float(max_wait_seconds))
     settle = max(0.3, float(settle_seconds))
-    started = time.time()
+    started = time.monotonic()
     stable_since = None
-    saw_loading = False
+    saw_loading = bool(observed_loading)
+    saw_busy = False
 
     while True:
-        now = time.time()
+        state = _fr_read_query_state()
+        now = time.monotonic()
         elapsed = now - started
-        loading = _fr_is_loading()
-        search_ready = _fr_is_search_button_ready()
-        if loading:
-            saw_loading = True
+        loading = state['loading']
+        search_ready = state['search_ready']
+        saw_loading = saw_loading or loading
+        saw_busy = saw_busy or search_ready is False
+        idle = not loading and search_ready is not False and state['ready_state'] in ('interactive', 'complete')
+        if not idle:
             stable_since = None
         else:
             if stable_since is None:
                 stable_since = now
             stable_elapsed = now - stable_since
-            # 若能读取 SEARCH 状态，则要求按钮恢复可用；否则仅依赖 loading 消失
-            search_ok = (search_ready is None) or bool(search_ready)
-            # 若见过 loading，则要求连续稳定 settle 秒；若没见过，至少给 1 秒缓冲
-            if stable_elapsed >= settle and (saw_loading or elapsed >= 1.0) and search_ok:
+            if stable_elapsed >= settle and (saw_loading or saw_busy):
                 return {
                     "ok": True,
                     "elapsed_seconds": round(elapsed, 3),
                     "saw_loading": saw_loading,
+                    "saw_busy": saw_busy,
                     "loading": False,
                     "search_ready": search_ready,
                     "timeout": False,
+                    "completion_confirmed": True,
+                    "completion_reason": "busy_then_stable",
                 }
 
         if elapsed >= timeout:
             return {
-                "ok": (not loading) and ((search_ready is None) or bool(search_ready)),
+                "ok": idle and stable_since is not None and now - stable_since >= settle,
                 "elapsed_seconds": round(elapsed, 3),
                 "saw_loading": saw_loading,
+                "saw_busy": saw_busy,
                 "loading": bool(loading),
                 "search_ready": search_ready,
                 "timeout": True,
+                "completion_confirmed": False,
+                "completion_reason": "no_activity_timeout_fallback" if not (saw_loading or saw_busy) and idle else "wait_limit",
             }
-        time.sleep(0.15)
+        time.sleep(min(0.15, max(0.0, timeout - elapsed)))
 
 
 def _query_wait_indicates_stall(wait_result):
-    """仅在等待耗尽且页面仍显示查询加载时判定为卡住。"""
+    """仅在配置等待耗尽且仍忙碌/未稳定时进入恢复流程。"""
     if not isinstance(wait_result, dict) or not wait_result.get("timeout"):
         return False
-    return bool(wait_result.get("loading", wait_result.get("saw_loading", False)))
+    return bool(wait_result.get("loading", wait_result.get("saw_loading", False))) or wait_result.get('search_ready') is False or wait_result.get('ok') is False
 
 
 def _should_skip_existing_matrix_field(current_value, target_value, want_clear=False):
@@ -4335,7 +4379,7 @@ def _recover_report(scene, plan, validate_label=''):
     )
 
 
-def _handle_matrix_item_exception(exc, scene, plan, seq, log_file, record_item_summary, item_started):
+def _handle_matrix_item_exception(exc, scene, plan, seq, log_file, record_item_summary, item_started, recover=None):
     """Handle an unexpected per-item crash and try to restore the report page."""
     msg = str(exc)
     print(f'  ✗ 当前条目异常: {msg}')
@@ -4348,7 +4392,7 @@ def _handle_matrix_item_exception(exc, scene, plan, seq, log_file, record_item_s
         "stage": "item_exception",
     })
     print('  🔄 尝试恢复页面后继续下一条...')
-    if _recover_report(scene, plan):
+    if (recover or _recover_report)(scene, plan):
         record_item_summary(seq, item_started, False, "item_exception_recovered")
         print('  ✓ 页面已恢复，继续下一条')
         return True
@@ -4510,7 +4554,7 @@ def _matrix_recovery_enabled(recovery_mode):
     raise ValueError(f'未知恢复模式: {recovery_mode}')
 
 
-def run_matrix_export(scene, recovery_mode='plain'):
+def run_matrix_export(scene, recovery_mode='recover'):
     """按场景配置执行矩阵查询导出。
 
     字段填充方式由 config.xlsx 对应 sheet 的 field.<字段>.method 控制。
@@ -4526,6 +4570,10 @@ def run_matrix_export(scene, recovery_mode='plain'):
         return
 
     field_methods_mode = 'config'
+    run_started = time.monotonic()
+    run_started_iso = datetime.now().isoformat(timespec='seconds')
+    stage_timer = _StageTimer()
+    stage_timer.switch('prepare')
 
     # 加载配置
     config = load_task_config(scene)
@@ -4592,13 +4640,35 @@ def run_matrix_export(scene, recovery_mode='plain'):
     run_dir = OUTPUT / run_id
     log_file = run_dir / 'run_log.jsonl'
     run_dir.mkdir(parents=True, exist_ok=True)
-    run_started = time.time()
-    run_started_iso = datetime.now().isoformat(timespec='seconds')
 
     ok_count = 0
     fail_count = 0
     option_cache = {}
     abort_reason = ""
+    attempt_count = 0
+    successful_seconds = 0.0
+    stage_totals = {name: 0.0 for name in ('prepare', 'fields', 'query', 'download', 'recovery')}
+    attempt_recorded = True
+
+    def recover_report(scene, plan, validate_label=''):
+        with stage_timer.measure('recovery'):
+            return _recover_report(scene, plan, validate_label=validate_label)
+
+    def retry_current_item(seq, coord, run_index, reason, validate_label=''):
+        retry_count = item_retry_counts.get(seq, 0) + 1
+        item_retry_counts[seq] = retry_count
+        _append_jsonl(log_file, {
+            "ts": datetime.now().isoformat(timespec='seconds'),
+            "type": "item_retry", "seq": seq, "scene": scene,
+            "reason": reason, "retry_count": retry_count,
+        })
+        if retry_count > MAX_CONSECUTIVE_ERRORS:
+            return False
+        if not recover_report(scene, plan, validate_label=validate_label):
+            return False
+        # 恢复会清空页面条件和查询结果，必须从填条件开始重新执行本条。
+        work_items.insert(run_index + 1, (seq, coord))
+        return True
 
     def validate_from_option_cache(fname, label, target_value, seq=None):
         cache_key = f'{scene}|{fname}'
@@ -4626,7 +4696,16 @@ def run_matrix_export(scene, recovery_mode='plain'):
         return target_in_options
 
     def record_item_summary(seq, item_started, ok, status):
-        item_elapsed = round(time.time() - item_started, 3)
+        nonlocal successful_seconds, attempt_recorded
+        if attempt_recorded:
+            return
+        stage_timer.switch()
+        item_elapsed = round(time.monotonic() - item_started, 3)
+        if ok:
+            successful_seconds += item_elapsed
+        for name, value in stage_timer.seconds.items():
+            stage_totals[name] += value
+        attempt_recorded = True
         _append_jsonl(log_file, {
             "ts": datetime.now().isoformat(timespec='seconds'),
             "type": "item_summary",
@@ -4636,6 +4715,7 @@ def run_matrix_export(scene, recovery_mode='plain'):
             "ok": bool(ok),
             "status": status,
             "elapsed_seconds": item_elapsed,
+            "stage_seconds": {name: round(value, 3) for name, value in stage_timer.seconds.items()},
         })
 
     for fname, finfo in fields.items():
@@ -4656,20 +4736,28 @@ def run_matrix_export(scene, recovery_mode='plain'):
         )
         print(f'  ✓ 已预加载 {fname} 候选池: {len(option_cache[cache_key])} 项')
 
+    stage_timer.switch()
+    for name, value in stage_timer.seconds.items():
+        stage_totals[name] += value
+
     interrupted = False
     interrupt_ts = None
 
     consecutive_errors = 0
     items_since_refresh = 0
     MAX_CONSECUTIVE_ERRORS = 3
-    query_stall_retry_counts = {}
+    item_retry_counts = {}
 
     # 遍历所有查询组合
     try:
         work_items = list(enumerate(coords, 1))
         for run_index, (seq, coord) in enumerate(work_items):
             try:
-                item_started = time.time()
+                item_started = time.monotonic()
+                attempt_count += 1
+                attempt_recorded = False
+                stage_timer = _StageTimer()
+                stage_timer.switch('prepare')
                 print(f'\\n[ {seq}/{total} ] {coord}')
     
                 # ── 页面存活检查 ──
@@ -4680,7 +4768,7 @@ def run_matrix_export(scene, recovery_mode='plain'):
                         "type": "page_recovery", "seq": seq, "scene": scene,
                         "reason": "page_not_alive",
                     })
-                    if _recover_report(scene, plan):
+                    if recover_report(scene, plan):
                         items_since_refresh = 0
                         consecutive_errors = 0
                     else:
@@ -4698,22 +4786,31 @@ def run_matrix_export(scene, recovery_mode='plain'):
                         "reason": "periodic",
                         "items_since_refresh": items_since_refresh,
                     })
-                    if _recover_report(scene, plan):
+                    if recover_report(scene, plan):
                         print('  ✓ 定时强恢复完成')
                         items_since_refresh = 0
                     else:
                         print('  ⚠️ 定时强恢复失败，继续尝试...')
     
-                # 防止上一轮查询尚未结束，先做一次短等待
+                # 已在查询时尊重完整配置上限，不能改条件或再发起查询。
                 if _fr_is_loading():
                     print('  检测到上次查询仍在加载，先等待结束...')
-                    prev_wait = _fr_wait_query_done(max(3.0, min(query_wait, 10.0)))
+                    with stage_timer.measure('query'):
+                        prev_wait = _fr_wait_query_done(query_wait, observed_loading=True)
                     prev_elapsed = prev_wait.get("elapsed_seconds", 0)
-                    if prev_wait.get("timeout"):
-                        print(f'  ⚠️ 上次查询加载状态未完全消失（{prev_elapsed:.2f}s），继续尝试当前轮')
+                    if _query_wait_indicates_stall(prev_wait):
+                        print(f'  ⚠️ 已等到配置上限（{prev_elapsed:.2f}s），上一轮查询尚未完成')
+                        if use_recovery and recover_report(scene, plan):
+                            items_since_refresh = 0
+                            consecutive_errors = 0
+                        else:
+                            fail_count += 1
+                            record_item_summary(seq, item_started, False, 'previous_query_incomplete')
+                            continue
                     else:
                         print(f'  ✓ 上次查询已结束（{prev_elapsed:.2f}s）')
     
+                stage_timer.switch('fields')
                 # 字段执行顺序: 场景优先级在前，其余字段兜底在后
                 ordered_fields = [f for f in SCENE_FILL_ORDER.get(scene, []) if f in coord]
                 ordered_fields.extend([f for f in coord.keys() if f not in ordered_fields])
@@ -4913,7 +5010,7 @@ def run_matrix_export(scene, recovery_mode='plain'):
                                     "label": label,
                                 })
                                 print(f'  🔄 {fname} 输入框不可用({msg})，尝试恢复报表页面...')
-                                if _recover_report(scene, plan, validate_label=label):
+                                if recover_report(scene, plan, validate_label=label):
                                     print('  ✓ 页面已恢复，重新开始本条查询前校验')
                                     consecutive_errors = 0
                                     items_since_refresh = 0
@@ -4941,6 +5038,7 @@ def run_matrix_export(scene, recovery_mode='plain'):
                         print('  ⚠️ 查询前校验结束：仍有字段未匹配')
                         all_ok = False
     
+                stage_timer.switch('prepare')
                 if not all_ok:
                     fail_count += 1
                     if query_enabled:
@@ -4968,6 +5066,7 @@ def run_matrix_export(scene, recovery_mode='plain'):
                     continue
     
                 # 点击查询
+                stage_timer.switch('query')
                 if not _fr_click_query():
                     print('  ✗ 未找到可点击的"查询"按钮')
                     _append_jsonl(log_file, {
@@ -4976,10 +5075,12 @@ def run_matrix_export(scene, recovery_mode='plain'):
                         "error": "query_button_not_found",
                     })
                     consecutive_errors += 1
-                    if use_recovery and _recover_report(scene, plan) and _fr_click_query():
-                        print('  ✓ 恢复后查询按钮已可用')
+                    if use_recovery and retry_current_item(seq, coord, run_index, 'query_button_not_found'):
+                        print('  ✓ 页面已恢复，将重新填写条件并查询当前条目')
                         consecutive_errors = 0
                         items_since_refresh = 0
+                        record_item_summary(seq, item_started, False, 'query_retry_scheduled')
+                        continue
                     elif not use_recovery:
                         print('  ✗ 正式入口不执行恢复兜底，跳过当前条目')
                         fail_count += 1
@@ -4998,9 +5099,9 @@ def run_matrix_export(scene, recovery_mode='plain'):
                 dialog_res = _fr_accept_possible_dialog() if not query_stalled else {"accepted": False}
                 if wait_res.get("timeout"):
                     if query_stalled:
-                        print(f'  ⚠️ 查询加载超过 {elapsed:.2f}s，判定页面卡住')
+                        print(f'  ⚠️ 已等待 {elapsed:.2f}s，达到配置上限但尚未确认查询完成')
                     else:
-                        print(f'  ⚠️ 查询等待超时（{elapsed:.2f}s），页面已不在加载，继续后续流程')
+                        print(f'  ⚠️ 未观察到查询忙碌信号，已等待完整配置时长（{elapsed:.2f}s），按兼容模式继续')
                 else:
                     print(f'  ✓ 查询完成（{elapsed:.2f}s）')
                 if dialog_res.get("accepted"):
@@ -5017,35 +5118,38 @@ def run_matrix_export(scene, recovery_mode='plain'):
                     "query_loading_at_timeout": bool(wait_res.get("loading")),
                     "query_stalled": query_stalled,
                     "query_search_ready": wait_res.get("search_ready"),
+                    "query_completion_confirmed": bool(wait_res.get("completion_confirmed")),
+                    "query_completion_reason": wait_res.get("completion_reason"),
                     "dialog": dialog_res,
                 })
 
                 if query_stalled and use_recovery:
-                    retry_count = query_stall_retry_counts.get(seq, 0) + 1
-                    query_stall_retry_counts[seq] = retry_count
                     _append_jsonl(log_file, {
                         "ts": datetime.now().isoformat(timespec='seconds'),
                         "type": "page_recovery", "seq": seq, "scene": scene,
-                        "reason": "query_stalled",
+                        "reason": "query_wait_limit",
                         "query_wait_seconds": query_wait,
                         "query_elapsed_seconds": elapsed,
-                        "retry_count": retry_count,
                     })
-                    if retry_count <= MAX_CONSECUTIVE_ERRORS:
-                        print(f'  🔄 查询仍在加载，执行强恢复后重试当前条（第 {retry_count}/{MAX_CONSECUTIVE_ERRORS} 次）...')
-                        validate_label = REPORT_LABEL_MAP.get(ordered_fields[0], '') if ordered_fields else ''
-                        if _recover_report(scene, plan, validate_label=validate_label):
-                            print(f'  ✓ 页面已恢复，将重新执行 [{seq}/{total}]')
-                            work_items.insert(run_index + 1, (seq, coord))
-                            consecutive_errors = 0
-                            items_since_refresh = 0
-                            continue
+                    validate_label = REPORT_LABEL_MAP.get(ordered_fields[0], '') if ordered_fields else ''
+                    if retry_current_item(seq, coord, run_index, 'query_wait_limit', validate_label):
+                        print(f'  ✓ 页面已恢复，将重新执行 [{seq}/{total}]')
+                        consecutive_errors = 0
+                        items_since_refresh = 0
+                        record_item_summary(seq, item_started, False, 'query_retry_scheduled')
+                        continue
 
-                    print('  ✗ 查询卡住后的页面恢复失败，跳过当前条目')
+                    print('  ✗ 查询尚未完成，恢复失败或已达到重试上限，跳过当前条目')
                     fail_count += 1
                     record_item_summary(seq, item_started, False, "query_stalled_recovery_failed")
                     continue
     
+                if query_stalled:
+                    fail_count += 1
+                    record_item_summary(seq, item_started, False, 'query_incomplete')
+                    continue
+
+                stage_timer.switch('prepare')
                 # 保存快照
                 snap_dir = run_dir / 'snapshots'
                 snap_dir.mkdir(exist_ok=True)
@@ -5068,6 +5172,7 @@ def run_matrix_export(scene, recovery_mode='plain'):
     
                 # 导出
                 if export_enabled:
+                    stage_timer.switch('download')
                     try:
                         download_dir, before_download = _download_snapshot()
                         if not _switch_to_report_frame(scene, plan):
@@ -5109,44 +5214,12 @@ def run_matrix_export(scene, recovery_mode='plain'):
                             fail_count += 1
                             record_item_summary(seq, item_started, False, "export_failed")
                             continue
-                        # 三级恢复后重试导出
-                        print('  🔄 尝试恢复后重试导出...')
-                        if _recover_report(scene, plan):
+                        print('  🔄 尝试恢复，重新填写条件、查询后再导出...')
+                        if retry_current_item(seq, coord, run_index, 'export_failed'):
                             consecutive_errors = 0
                             items_since_refresh = 0
-                            try:
-                                download_dir2, before_download2 = _download_snapshot()
-                                if not _switch_to_report_frame(scene, plan):
-                                    raise RuntimeError("导出前切换报表iframe失败")
-                                _fr_click_export()
-                                download_res2 = _wait_download_delta(before_download2, timeout=25.0)
-                                if _download_result_ok(download_res2):
-                                    download_res2 = _rename_download_files(download_res2, seq, scene, field_methods_mode)
-                                for f2 in (download_res2.get("files") or []):
-                                    print(f'  ✓ 下载文件路径: {f2.get("path")} ({f2.get("size")} bytes)')
-                                _append_jsonl(log_file, {
-                                    "ts": datetime.now().isoformat(timespec='seconds'),
-                                    "type": "export_done", "seq": seq, "scene": scene,
-                                    "field_methods_mode": field_methods_mode,
-                                    "download": download_res2,
-                                })
-                                if not _download_result_ok(download_res2):
-                                    print('  ✗ 重试导出仍未确认新增下载文件')
-                                    fail_count += 1
-                                    record_item_summary(seq, item_started, False, "export_failed")
-                                    continue
-                                try:
-                                    from selenium.webdriver.common.action_chains import ActionChains
-                                    ActionChains(_driver).send_keys('').perform()
-                                except Exception:
-                                    pass
-                                time.sleep(0.3)
-                                _switch_to_report_frame(scene, plan)
-                            except Exception as e2:
-                                print(f'  ✗ 重试导出仍失败: {e2}')
-                                fail_count += 1
-                                record_item_summary(seq, item_started, False, "export_failed")
-                                continue
+                            record_item_summary(seq, item_started, False, 'export_retry_scheduled')
+                            continue
                         else:
                             print('  ✗ 恢复失败，跳过当前条目')
                             fail_count += 1
@@ -5161,7 +5234,7 @@ def run_matrix_export(scene, recovery_mode='plain'):
             except Exception as e:
                 fail_count += 1
                 if use_recovery:
-                    if _handle_matrix_item_exception(e, scene, plan, seq, log_file, record_item_summary, item_started):
+                    if _handle_matrix_item_exception(e, scene, plan, seq, log_file, record_item_summary, item_started, recover=recover_report):
                         items_since_refresh = 0
                         consecutive_errors = 0
                 else:
@@ -5179,6 +5252,8 @@ def run_matrix_export(scene, recovery_mode='plain'):
                 continue
     except KeyboardInterrupt:
         interrupted = True
+        if not attempt_recorded:
+            record_item_summary(seq, item_started, False, 'interrupted')
         interrupt_ts = datetime.now().isoformat(timespec='seconds')
         _append_jsonl(log_file, {
             "ts": interrupt_ts,
@@ -5192,9 +5267,10 @@ def run_matrix_export(scene, recovery_mode='plain'):
         print('\n⚠️ 已收到停止指令，当前任务已中断，返回主菜单')
 
     # 总结
-    run_elapsed = round(time.time() - run_started, 3)
-    avg_elapsed = round(run_elapsed / total, 3) if total else 0
-    avg_success_elapsed = round(run_elapsed / ok_count, 3) if ok_count else 0
+    run_elapsed = round(time.monotonic() - run_started, 3)
+    processed = ok_count + fail_count
+    avg_elapsed = round(run_elapsed / processed, 3) if processed else 0
+    avg_success_elapsed = round(successful_seconds / ok_count, 3) if ok_count else 0
     summary = {
         "ts": datetime.now().isoformat(timespec='seconds'),
         "run_started": run_started_iso,
@@ -5205,6 +5281,9 @@ def run_matrix_export(scene, recovery_mode='plain'):
         "total": total,
         "ok": ok_count,
         "fail": fail_count,
+        "processed": processed,
+        "attempt_count": attempt_count,
+        "stage_seconds": {name: round(value, 3) for name, value in stage_totals.items()},
         "elapsed_seconds": run_elapsed,
         "elapsed_minutes": round(run_elapsed / 60, 3),
         "avg_seconds_per_item": avg_elapsed,
@@ -5225,7 +5304,9 @@ def run_matrix_export(scene, recovery_mode='plain'):
         print(f'⚠️ 汇总耗时文件写入失败: {e}')
     status_text = "已中断" if interrupted else "执行完成"
     print(f'\\n✅ {scene} [{field_methods_mode}] {status_text}: 成功 {ok_count}, 失败 {fail_count} / 共 {total}')
-    print(f'⏱️ 总耗时: {run_elapsed:.2f}s ({run_elapsed / 60:.2f}分钟) | 平均每条: {avg_elapsed:.2f}s | 平均成功: {avg_success_elapsed:.2f}s')
+    print(f'⏱️ 总耗时: {run_elapsed:.2f}s ({run_elapsed / 60:.2f}分钟) | 已处理: {processed}/{total} 条 | 平均每条: {avg_elapsed:.2f}s | 成功轮次平均: {avg_success_elapsed:.2f}s')
+    print('⏱️ 阶段累计: ' + ' | '.join(f'{label} {stage_totals[key]:.2f}s' for key, label in (
+        ('fields', '填条件'), ('query', '查询'), ('download', '导出下载'), ('recovery', '恢复'), ('prepare', '其他准备'))))
     print(f'\\U0001f4dd 日志: {run_dir}')
 
 
@@ -6391,18 +6472,6 @@ def main():
         elif choice == '12':
 
             browser_smoke_test()
-
-        elif choice in ('3p', '3P'):
-
-            run_matrix_export('county', recovery_mode='plain')
-
-        elif choice in ('4p', '4P'):
-
-            run_matrix_export('org', recovery_mode='plain')
-
-        elif choice in ('5p', '5P'):
-
-            run_matrix_export('county2', recovery_mode='plain')
 
         elif choice in ('r', 'R'):
 

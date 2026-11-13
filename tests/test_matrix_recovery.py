@@ -31,7 +31,7 @@ class MatrixRecoveryTests(unittest.TestCase):
         self.assertFalse(main._download_result_ok({"ok": True, "files": []}))
         self.assertFalse(main._download_result_ok(None))
 
-    def test_query_timeout_is_stalled_only_while_loading(self):
+    def test_query_timeout_requires_busy_or_incomplete_state(self):
         self.assertTrue(main._query_wait_indicates_stall({"timeout": True, "saw_loading": True}))
         self.assertFalse(main._query_wait_indicates_stall({"timeout": True, "saw_loading": False}))
         self.assertFalse(main._query_wait_indicates_stall({"timeout": True, "saw_loading": True, "loading": False}))
@@ -256,31 +256,27 @@ class MatrixRecoveryTests(unittest.TestCase):
                 with (
                     patch("builtins.input", side_effect=[choice, "0"]),
                     patch.object(main, "print_menu"),
+                    patch.object(main, "sync_config_json_from_excel", return_value={}),
+                    patch.object(main, "driver_alive", return_value=False),
                     patch.object(main, "run_matrix_export", side_effect=lambda scene, recovery_mode='plain': calls.append((scene, recovery_mode))),
                 ):
                     main.main()
 
                 self.assertEqual(calls, [expected])
 
-    def test_plain_download_aliases_are_hidden_and_use_plain_mode(self):
-        cases = [
-            ("3p", ("county", "plain")),
-            ("4p", ("org", "plain")),
-            ("5p", ("county2", "plain")),
-        ]
-
-        for choice, expected in cases:
+    def test_plain_download_aliases_are_removed(self):
+        for choice in ('3p', '3P', '4p', '4P', '5p', '5P'):
             with self.subTest(choice=choice):
-                calls = []
-
                 with (
                     patch("builtins.input", side_effect=[choice, "0"]),
                     patch.object(main, "print_menu"),
-                    patch.object(main, "run_matrix_export", side_effect=lambda scene, recovery_mode='plain': calls.append((scene, recovery_mode))),
+                    patch.object(main, "sync_config_json_from_excel", return_value={}),
+                    patch.object(main, "driver_alive", return_value=False),
+                    patch.object(main, "run_matrix_export") as export,
                 ):
                     main.main()
 
-                self.assertEqual(calls, [expected])
+                export.assert_not_called()
 
     def test_old_recovery_test_aliases_are_removed(self):
         for choice in ("t31", "t41", "t51"):
@@ -288,6 +284,8 @@ class MatrixRecoveryTests(unittest.TestCase):
                 with (
                     patch("builtins.input", side_effect=[choice, "0"]),
                     patch.object(main, "print_menu"),
+                    patch.object(main, "sync_config_json_from_excel", return_value={}),
+                    patch.object(main, "driver_alive", return_value=False),
                     patch.object(main, "run_matrix_export") as export,
                 ):
                     main.main()
