@@ -2,9 +2,38 @@
 
 网页自动化工具 — 基于 Python + Selenium 的 FineReport 报表自动查询、导出、批量填充工具。
 
+## Windows 测试版下载
+
+当前发布：**v1.0.3-windows-test.1**，发布于 2026-11-17，程序构建于 2026-11-13。
+
+- **[下载 Windows x64 完整测试包 ZIP（推荐，约 36 MB）](https://github.com/Azi-lzb/py_Chrome_Download/releases/download/v1.0.3-windows-test.1/ChromeAutoRun_Windows_test_20261113_114740.zip)**：包含 EXE、ChromeDriver 和驱动许可文件。
+- [单独下载 ChromeAutoRun.exe（约 24 MB）](https://github.com/Azi-lzb/py_Chrome_Download/releases/download/v1.0.3-windows-test.1/ChromeAutoRun.exe)：适合已有匹配驱动、只需更新程序的用户。
+- [下载 SHA256 校验文件](https://github.com/Azi-lzb/py_Chrome_Download/releases/download/v1.0.3-windows-test.1/SHA256SUMS.txt) · [本次发布说明](https://github.com/Azi-lzb/py_Chrome_Download/releases/tag/v1.0.3-windows-test.1) · [全部 Releases](https://github.com/Azi-lzb/py_Chrome_Download/releases)
+
+Windows EXE 已包含 Python、Selenium 和 openpyxl，使用现成测试包无需安装 Python。**Chrome 浏览器需单独安装**；包内驱动为 `157.0.8103.51`，已使用同版本 Chrome 验证。浏览器版本不同时，请更换匹配的 `chromedriver.exe`。
+
+### 解压后如何使用
+
+1. 将 ZIP 完整解压到可写目录，再运行其中的 `ChromeAutoRun.exe`；`chromedriver.exe` 必须与 EXE 放在同一目录。
+2. 如有旧配置，将自己的 `config.xlsx` 复制到该目录。首次运行没有配置时，程序会自动生成空白模板；可通过菜单 `11` 打开填写，保存后重启程序。
+3. 使用菜单 `9` 检查依赖和配置；菜单 `12 → 1` 可进行不联网的本地按钮测试。
+4. 配置完成后，菜单 `2.5` 执行一键启动、登录和报表导航，再使用 `3/4/5` 查询导出。
+
+测试包不含个人配置、账号、浏览器登录状态或浏览器本体。HTML 和运行日志保存在程序目录下的 `output/`；导出文件默认保存在用户的 `Downloads/`，程序会打印具体绝对路径。
+
+### 本次更新与验证范围
+
+- 合并查询加载状态、按钮状态和文档状态读取，减少浏览器通信。
+- 按配置上限等待慢查询；未观察到忙碌信号时，等待完整配置时长再按兼容模式继续。
+- 查询或导出恢复后，重新填写条件、查询后再导出，并限制重试次数。
+- 新增阶段耗时统计，修正中断后的平均耗时；文件头检查只读取 512 字节。
+- 删除旧的无恢复导出别名，统一使用菜单 `3/4/5`。
+
+35 项相关测试、EXE 启动与依赖自检、Chrome 本地离线页面验证已通过；尚未验证真实内网业务。本次发布为预发布测试版。全量测试中另外两项批量填充配置测试因旧代码缺少 `parse_batch_fill_config` 失败，已在修改前的版本复现。
+
 ## 环境要求
 
-- Python 3.8+
+- 源码运行：Python 3.8+；使用 Windows EXE 无需安装 Python
 - Google Chrome 浏览器
 - Windows 源码运行：chromedriver.exe（与 Chrome 版本匹配，放在项目根目录）
 - Linux DEB：Chrome/Chromium 浏览器（ChromeDriver 随 DEB 预装）
@@ -92,7 +121,7 @@ python main.py
 | `batch_fill_rules` | 批量填充字段规则（condition_index / field_label / field_value） |
 | `fr_widget_map` | FineReport widget 名称映射（精确定位输入框） |
 
-详细配置写法见 `使用说明与配置说明.md`。
+详细配置写法见 [使用说明与配置说明](使用说明与配置说明.md)。
 
 `county/org/county2` 会优先按 `task.report_title_keyword` 切换外层报表标签页；如果同名候选多个且未配置 `task.report_title_index`，程序会停止并打印候选，避免导错报表。
 
@@ -119,7 +148,9 @@ output/
 ## 项目结构
 
 ```
-├── main.py              # 主程序（单文件，约 2300 行）
+├── main.py              # 主程序（单文件）
+├── 启动菜单.bat          # 开发启动与 Windows/Linux 打包入口
+├── dist_hzpbc/          # Windows EXE、匹配驱动和测试 ZIP
 ├── config.xlsx          # 配置文件
 ├── config.json          # 运行时配置（由 config.xlsx 自动同步）
 ├── chromedriver.exe     # Chrome 驱动

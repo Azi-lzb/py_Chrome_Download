@@ -1,0 +1,2 @@
+275fe8ff37c0fbbb7c9a0c546e2fb018e1f6feff18e0e239e927cf131ee85447  ChromeAutoRun.exe
+7adf0b1f97d073d59fbed3a1f6989b6521946d0968c2bd90cd5b17b8aa7784ec  ChromeAutoRun_Windows_test_20261113_114740.zip
